@@ -31,11 +31,15 @@
 .auth-card h2 { color: #193651; font-size: clamp(32px, 2.5vw, 43px); font-weight: 400; letter-spacing: -.035em; line-height: 1.2; margin: 18px 0 15px; }
 .form-subtitle { color: #788b9d; font-size: 14px; margin: 0 0 43px; }
 .field-label { display: block; color: #18334e; font-size: 13px; font-weight: 600; margin-bottom: 23px; }
+.field-hint { display: block; margin-top: 7px; color: #788b9d; font-size: 11px; font-weight: 400; }
 .input-wrap { height: 68px; box-sizing: border-box; width: 100%; display: flex; align-items: center; margin-top: 11px; border: 1px solid #d4dde5; border-radius: 11px; color: #8293a1; transition: border-color .18s, box-shadow .18s; }
 .input-wrap:focus-within { border-color: #4b8583; box-shadow: 0 0 0 3px rgba(75,133,131,.12); }
 .input-icon { display: flex; margin: 0 17px; flex: 0 0 auto; }
-.input-wrap input { width: 100%; min-width: 0; height: 100%; border: 0; outline: 0; color: #17334e; background: transparent; font: inherit; font-size: 14px; }
-.input-wrap input::placeholder { color: #9aa8b4; }
+.input-wrap input, .input-wrap select { width: 100%; min-width: 0; height: 100%; border: 0; outline: 0; color: #17334e; background: transparent; font: inherit; font-size: 14px; }
+.input-wrap input::placeholder, .input-wrap select:invalid { color: #9aa8b4; }
+.input-wrap select { appearance: none; cursor: pointer; padding-right: 16px; }
+.input-wrap select:disabled { cursor: not-allowed; color: #9aa8b4; }
+.field-hint.field-error { color: #a74747; }
 .icon-button { display: grid; place-items: center; color: #80919e; border: 0; background: transparent; cursor: pointer; }
 .password-toggle { padding: 14px 18px; }
 .form-options { display: flex; justify-content: space-between; align-items: center; margin: -3px 0 26px; color: #718497; font-size: 13px; }
@@ -45,6 +49,7 @@
 .text-button:hover { color: #193651; text-decoration: underline; }
 .submit-button { width: 100%; height: 70px; display: flex; justify-content: center; align-items: center; gap: 15px; border: 0; border-radius: 11px; color: #fff; background: #193651; font: inherit; font-size: 16px; font-weight: 600; cursor: pointer; transition: background .2s, transform .2s; }
 .submit-button:hover { background: #244b6c; }
+.submit-button:disabled { opacity: .7; cursor: wait; }
 .submit-button:active { transform: translateY(1px); }
 .submit-button:focus-visible, .text-button:focus-visible, .icon-button:focus-visible { outline: 3px solid #70a9a4; outline-offset: 3px; }
 .notice { margin: -5px 0 17px; padding: 11px 13px; border-radius: 8px; color: #285d5b; background: #edf7f4; font-size: 12px; line-height: 1.5; }
