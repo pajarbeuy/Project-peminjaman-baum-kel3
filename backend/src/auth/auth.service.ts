@@ -12,6 +12,7 @@ import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { Role } from '../common/enums/role.enum';
+import { FacultiesService } from '../faculties/faculties.service';
 
 const BCRYPT_SALT_ROUNDS = 12;
 
@@ -21,6 +22,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly facultiesService: FacultiesService,
   ) {}
 
   /**
@@ -29,6 +31,11 @@ export class AuthService {
    * untuk mencegah privilege escalation.
    */
   async register(dto: RegisterDto): Promise<AuthResponseDto> {
+    const faculty = await this.facultiesService.findById(dto.fakultasId);
+    if (!faculty) {
+      throw new ConflictException('Fakultas yang dipilih tidak terdaftar.');
+    }
+
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) {
       // Pesan generik agar tidak mengungkap apakah email terdaftar (sesuai keputusan OI-2)
