@@ -7,6 +7,10 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.enableCors({
+    origin: process.env.FRONTEND_URL ?? 'http://localhost:5173',
+  });
+
   // Prefix API global
   app.setGlobalPrefix('api/v1');
 
