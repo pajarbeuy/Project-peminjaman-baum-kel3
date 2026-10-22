@@ -1,0 +1,7 @@
+export enum Role {
+  MAHASISWA = 'MAHASISWA',
+  TU = 'TU',
+  BAUM_STAFF = 'BAUM_STAFF',
+  KABAG_UMUM = 'KABAG_UMUM',
+  KABIRO = 'KABIRO',
+}
