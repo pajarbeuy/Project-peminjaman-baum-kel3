@@ -3,6 +3,7 @@ import 'dotenv/config';
 import { DataSource } from 'typeorm';
 import { User } from './src/users/entities/user.entity';
 import { Faculty } from './src/faculties/entities/faculty.entity';
+import { Program } from './src/programs/entities/program.entity';
 
 /**
  * DataSource untuk TypeORM CLI.
@@ -17,7 +18,7 @@ export default new DataSource({
   username: process.env.DB_USERNAME ?? 'root',
   password: process.env.DB_PASSWORD ?? '',
   database: process.env.DB_DATABASE ?? 'peminjaman_ukri',
-  entities: [User, Faculty],
+  entities: [User, Faculty, Program],
   migrations: ['src/database/migrations/*.ts'],
   synchronize: false,
 });
