@@ -12,4 +12,6 @@ export interface JwtPayload {
   role: Role;
   /** Scope fakultas — digunakan oleh guard TU (BR-03). Null untuk BAUM/KABAG/KABIRO. */
   fakultasId: string | null;
+  /** Program studi mahasiswa; null untuk role non-mahasiswa. */
+  programId: string | null;
 }

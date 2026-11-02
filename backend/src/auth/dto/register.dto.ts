@@ -43,4 +43,12 @@ export class RegisterDto {
   @IsUUID('4', { message: 'fakultasId harus berupa UUID yang valid.' })
   @IsNotEmpty({ message: 'fakultasId wajib diisi.' })
   fakultasId: string;
+
+  @ApiProperty({
+    example: 'b1000000-0000-4000-8000-000000000001',
+    description: 'UUID program studi yang berada di fakultas terpilih.',
+  })
+  @IsUUID('4', { message: 'programId harus berupa UUID yang valid.' })
+  @IsNotEmpty({ message: 'programId wajib diisi.' })
+  programId: string;
 }
