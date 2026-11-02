@@ -3,6 +3,7 @@ import './App.css'
 
 type IconName = 'user' | 'lock' | 'eye' | 'arrow' | 'check' | 'mail' | 'building'
 type FacultyOption = { id: string; nama: string }
+type ProgramOption = { id: string; nama: string; fakultasId?: string }
 
 function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
   const paths: Record<IconName, ReactNode> = {
@@ -26,6 +27,12 @@ function App() {
   const [faculties, setFaculties] = useState<FacultyOption[]>([])
   const [isLoadingFaculties, setIsLoadingFaculties] = useState(false)
   const [facultyError, setFacultyError] = useState('')
+  const [selectedFacultyId, setSelectedFacultyId] = useState('')
+  const [programs, setPrograms] = useState<ProgramOption[]>([])
+  const [selectedProgramId, setSelectedProgramId] = useState('')
+  const [isLoadingPrograms, setIsLoadingPrograms] = useState(false)
+  const [programError, setProgramError] = useState('')
+  const [programRequestVersion, setProgramRequestVersion] = useState(0)
   const isLogin = mode === 'login'
   const apiBaseUrl = import.meta.env.VITE_API_URL ?? 'http://localhost:3000/api/v1'
 
@@ -62,10 +69,47 @@ function App() {
     return () => controller.abort()
   }, [apiBaseUrl, isLogin])
 
+  useEffect(() => {
+    if (isLogin || !selectedFacultyId) return
+
+    const controller = new AbortController()
+    async function loadPrograms() {
+      setIsLoadingPrograms(true)
+      setProgramError('')
+      try {
+        const response = await fetch(
+          `${apiBaseUrl}/faculties/${encodeURIComponent(selectedFacultyId)}/programs`,
+          { signal: controller.signal },
+        )
+        if (!response.ok) throw new Error('Daftar program studi belum dapat dimuat.')
+        const data: unknown = await response.json()
+        if (!Array.isArray(data) || !data.every((item) =>
+          typeof item?.id === 'string' && typeof item?.nama === 'string'
+        )) {
+          throw new Error('Format data program studi dari server belum sesuai.')
+        }
+        setPrograms(data as ProgramOption[])
+        if (data.length === 0) setProgramError('Belum ada program studi untuk fakultas ini.')
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return
+        setProgramError(error instanceof TypeError
+          ? 'Backend tidak dapat dijangkau. Coba muat ulang daftar program studi.'
+          : error instanceof Error ? error.message : 'Gagal memuat program studi.')
+      } finally {
+        if (!controller.signal.aborted) setIsLoadingPrograms(false)
+      }
+    }
+
+    void loadPrograms()
+    return () => controller.abort()
+  }, [apiBaseUrl, isLogin, programRequestVersion, selectedFacultyId])
+
   function changeMode(next: 'login' | 'register') {
     setMode(next)
     setNotice('')
     setShowPassword(false)
+    setSelectedFacultyId('')
+    setSelectedProgramId('')
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -91,6 +135,7 @@ function App() {
           namaLengkap: formData.get('namaLengkap'),
           nim: formData.get('nim'),
           fakultasId: formData.get('fakultasId'),
+          programId: formData.get('programId'),
         }),
       })
       const result = await response.json()
@@ -149,7 +194,11 @@ function App() {
 
             {!isLogin && <label className="field-label" htmlFor="nim">NIM<div className="input-wrap"><span className="input-icon"><Icon name="user" /></span><input id="nim" name="nim" autoComplete="off" placeholder="Nomor Induk Mahasiswa" required /></div></label>}
 
-            {!isLogin && <label className="field-label" htmlFor="faculty-id">Fakultas<div className="input-wrap"><span className="input-icon"><Icon name="building" /></span><select id="faculty-id" name="fakultasId" defaultValue="" required disabled={isLoadingFaculties || faculties.length === 0}><option value="" disabled>{isLoadingFaculties ? 'Memuat fakultas…' : 'Pilih fakultas'}</option>{faculties.map((faculty) => <option key={faculty.id} value={faculty.id}>{faculty.nama}</option>)}</select></div><small className={`field-hint${facultyError ? ' field-error' : ''}`} role={facultyError ? 'status' : undefined}>{facultyError || 'Pilih fakultas sesuai data akademik Anda.'}</small></label>}
+            {!isLogin && <>
+              <label className="field-label" htmlFor="faculty-id">Fakultas<div className="input-wrap"><span className="input-icon"><Icon name="building" /></span><select id="faculty-id" name="fakultasId" value={selectedFacultyId} onChange={(event) => { setSelectedFacultyId(event.target.value); setSelectedProgramId(''); setPrograms([]); setProgramError('') }} required disabled={isLoadingFaculties || faculties.length === 0}><option value="" disabled>{isLoadingFaculties ? 'Memuat fakultas…' : 'Pilih fakultas'}</option>{faculties.map((faculty) => <option key={faculty.id} value={faculty.id}>{faculty.nama}</option>)}</select></div><small className={`field-hint${facultyError ? ' field-error' : ''}`} role={facultyError ? 'status' : undefined}>{facultyError || 'Pilih fakultas sesuai data akademik Anda.'}</small></label>
+
+              <label className="field-label" htmlFor="program-id">Program studi<div className="input-wrap"><span className="input-icon"><Icon name="building" /></span><select id="program-id" name="programId" value={selectedProgramId} onChange={(event) => setSelectedProgramId(event.target.value)} required disabled={!selectedFacultyId || isLoadingPrograms || programs.length === 0}><option value="" disabled>{!selectedFacultyId ? 'Pilih fakultas terlebih dahulu' : isLoadingPrograms ? 'Memuat program studi…' : 'Pilih program studi'}</option>{programs.map((program) => <option key={program.id} value={program.id}>{program.nama}</option>)}</select></div><small className={`field-hint${programError ? ' field-error' : ''}`} role={programError ? 'status' : undefined}>{programError || 'Pilih program studi sesuai data akademik Anda.'}</small>{programError && selectedFacultyId && <button className="text-button field-retry" type="button" onClick={() => setProgramRequestVersion((version) => version + 1)}>Coba muat ulang</button>}</label>
+            </>}
 
             <label className="field-label" htmlFor="email">Email institusi<div className="input-wrap"><span className="input-icon"><Icon name="mail" /></span><input id="email" name="email" type="email" autoComplete="email" placeholder="nama@ukri.ac.id" required /></div></label>
 
