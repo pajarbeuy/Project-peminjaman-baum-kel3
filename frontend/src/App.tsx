@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import SprintTwo from './SprintTwo'
 import './App.css'
 
 type IconName = 'user' | 'lock' | 'eye' | 'arrow' | 'check' | 'mail' | 'building'
@@ -20,6 +21,17 @@ function Icon({ name, size = 20 }: { name: IconName; size?: number }) {
 }
 
 function App() {
+  const [signedInUser, setSignedInUser] = useState<{ namaLengkap: string; role: string } | null>(() => {
+    try {
+      const raw = sessionStorage.getItem('baum.user')
+      const user: unknown = raw ? JSON.parse(raw) : null
+      if (typeof user === 'object' && user !== null && 'namaLengkap' in user && 'role' in user
+        && typeof user.namaLengkap === 'string' && typeof user.role === 'string') {
+        return { namaLengkap: user.namaLengkap, role: user.role }
+      }
+    } catch { /* Sesi yang tidak valid akan meminta pengguna masuk kembali. */ }
+    return null
+  })
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [showPassword, setShowPassword] = useState(false)
   const [notice, setNotice] = useState('')
@@ -147,6 +159,7 @@ function App() {
       sessionStorage.setItem('baum.accessToken', result.accessToken)
       sessionStorage.setItem('baum.refreshToken', result.refreshToken)
       sessionStorage.setItem('baum.user', JSON.stringify(result.user))
+      setSignedInUser({ namaLengkap: result.user.namaLengkap, role: result.user.role })
       setNotice(`${isLogin ? 'Berhasil masuk' : 'Pendaftaran berhasil'}, ${result.user?.namaLengkap ?? 'pengguna'}.`)
     } catch (error) {
       setNotice(error instanceof TypeError
@@ -156,6 +169,22 @@ function App() {
       setIsSubmitting(false)
     }
   }
+
+  async function signOut() {
+    const token = sessionStorage.getItem('baum.accessToken')
+    try {
+      if (token) await fetch(`${apiBaseUrl}/auth/logout`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+    } catch {
+      // Sesi lokal tetap dihapus meskipun server logout sedang tidak terjangkau.
+    } finally {
+      sessionStorage.removeItem('baum.accessToken')
+      sessionStorage.removeItem('baum.refreshToken')
+      sessionStorage.removeItem('baum.user')
+      setSignedInUser(null)
+    }
+  }
+
+  if (signedInUser) return <SprintTwo user={signedInUser} onLogout={() => void signOut()} />
 
   return (
     <main className="auth-layout">
