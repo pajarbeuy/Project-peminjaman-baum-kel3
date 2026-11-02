@@ -25,6 +25,9 @@
     "migration:show": "tsx node_modules/typeorm/cli.js migration:show -d data-source.ts",
     "seed:faculties": "tsx src/database/seeds/seed-faculties.ts",
     "seed:programs": "tsx src/database/seeds/seed-programs.ts",
+    "seed:rooms": "tsx src/database/seeds/seed-rooms.ts",
+    "seed:labs": "tsx src/database/seeds/seed-labs.ts",
+    "seed:items": "tsx src/database/seeds/seed-items.ts",
     "seed:staff": "tsx src/database/seeds/seed-staff.ts"
   },
   "dependencies": {
