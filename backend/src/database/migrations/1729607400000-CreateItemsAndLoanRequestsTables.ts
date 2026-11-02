@@ -15,7 +15,7 @@ export class CreateItemsAndLoanRequestsTables1729607400000 implements MigrationI
       { name: 'unitKerja', type: 'varchar', length: '255' }, { name: 'penanggungJawab', type: 'varchar', length: '255' },
       { name: 'kontakPeminjam', type: 'varchar', length: '50' }, { name: 'roomId', type: 'varchar', length: '36', isNullable: true },
       { name: 'labId', type: 'varchar', length: '36', isNullable: true },
-      { name: 'status', type: 'enum', enum: ['DIAJUKAN','DIVERIFIKASI_TU','DIPROSES_BAUM','DISETUJUI','DIKELUARKAN','SELESAI','DITOLAK'], default: "'DIAJUKAN'" },
+      { name: 'status', type: 'enum', enum: ['DRAFT','DIAJUKAN','DIVERIFIKASI_TU','DIPROSES_BAUM','DISETUJUI','DIKELUARKAN','SELESAI','DITOLAK'], default: "'DRAFT'" },
       { name: 'createdAt', type: 'datetime', default: 'CURRENT_TIMESTAMP' },
     ], indices: [{ name: 'IDX_loan_requests_user', columnNames: ['userId'] }, { name: 'IDX_loan_requests_schedule', columnNames: ['roomId','labId','tanggalMulai'] }] }), true);
     await q.createTable(new Table({ name: 'loan_request_items', columns: [

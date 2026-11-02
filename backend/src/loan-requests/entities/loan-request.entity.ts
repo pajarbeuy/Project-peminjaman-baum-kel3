@@ -13,6 +13,7 @@ export class LoanRequest {
   @Column({ type: 'varchar', length: 50 }) kontakPeminjam: string;
   @Column({ type: 'varchar', length: 36, nullable: true }) roomId: string | null;
   @Column({ type: 'varchar', length: 36, nullable: true }) labId: string | null;
-  @Column({ type: 'enum', enum: LoanRequestStatus, default: LoanRequestStatus.DIAJUKAN }) status: LoanRequestStatus;
+  @Column({ type: 'enum', enum: LoanRequestStatus, default: LoanRequestStatus.DRAFT }) status: LoanRequestStatus;
+  @Column({ type: 'varchar', length: 1000, nullable: true }) rejectionReason: string | null;
   @Column({ type: 'datetime', default: () => 'CURRENT_TIMESTAMP' }) createdAt: Date;
 }

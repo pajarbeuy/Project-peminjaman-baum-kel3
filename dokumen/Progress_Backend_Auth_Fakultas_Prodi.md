@@ -22,6 +22,8 @@ Fitur backend berikut sudah tersedia:
 - Data laboratorium.
 - Data barang dan stok tersedia.
 - Fondasi pengajuan peminjaman dengan validasi H-7, resource, dan stok.
+- Alur draft, submit dokumen wajib, dan transisi status berbasis role.
+- Upload dokumen privat untuk pengajuan.
 - Validasi bahwa program studi sesuai dengan fakultas saat registrasi.
 - Migration dan seeder untuk tabel pengguna, fakultas, dan program studi.
 
@@ -70,6 +72,12 @@ Role pada endpoint registrasi selalu dibuat sebagai `MAHASISWA`; role tidak dite
 | GET | `/api/v1/items` | Mengambil daftar barang dan stok tersedia | Publik |
 | POST | `/api/v1/loan-requests` | Membuat pengajuan peminjaman | Access token |
 | GET | `/api/v1/loan-requests/mine` | Mengambil pengajuan milik pengguna | Access token |
+| POST | `/api/v1/loan-requests/{id}/submit` | Mengirim draft setelah dokumen wajib lengkap | Access token |
+| POST | `/api/v1/loan-requests/{id}/documents` | Upload dokumen pendukung privat | Access token |
+| POST | `/api/v1/loan-requests/{id}/verify-tu` | Verifikasi tahap TU | Role TU |
+| POST | `/api/v1/loan-requests/{id}/process-baum` | Memproses pengajuan di BAUM | Role BAUM Staff |
+| POST | `/api/v1/loan-requests/{id}/approve` | Persetujuan akhir | Role Kabag Umum |
+| POST | `/api/v1/loan-requests/{id}/reject` | Menolak pengajuan dengan alasan | TU/BAUM/Kabag |
 
 Frontend menggunakan alur berikut:
 
@@ -170,6 +178,8 @@ Migration yang sudah tersedia:
 5. `1729607200000-CreateRoomsTable`
 6. `1729607300000-CreateLabsTable`
 7. `1729607400000-CreateItemsAndLoanRequestsTables`
+8. `1729607500000-CreateLoanDocumentsTable`
+9. `1729607600000-AddDraftLoanRequestStatus`
 
 Jalankan dari folder `backend`:
 
@@ -256,6 +266,7 @@ Pengujian Jest belum dinyatakan lulus. Konfigurasi test yang ada sebelumnya berh
 - Memastikan daftar nama fakultas dan program studi telah divalidasi stakeholder.
 - Menghubungkan dropdown fakultas-program studi pada frontend.
 - Menghubungkan form pengajuan dan daftar barang ke frontend.
-- Menambahkan upload dokumen privat dan validasi dokumen wajib.
+- Menambahkan endpoint unduh dokumen privat dengan authorization pemilik/TU/BAUM.
+- Menambahkan test unit/integration untuk pengajuan dan validasi stok.
 - Menambahkan test unit/integration untuk pengajuan dan validasi stok.
 - Meninjau kembali konfigurasi CORS, rate limiting, dan pengelolaan token untuk deployment produksi.

@@ -1,4 +1,5 @@
 export enum LoanRequestStatus {
+  DRAFT = 'DRAFT',
   DIAJUKAN = 'DIAJUKAN',
   DIVERIFIKASI_TU = 'DIVERIFIKASI_TU',
   DIPROSES_BAUM = 'DIPROSES_BAUM',
