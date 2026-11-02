@@ -15,10 +15,12 @@ import { Item } from '../items/entities/item.entity';
 import { Room } from '../rooms/entities/room.entity';
 import { Lab } from '../labs/entities/lab.entity';
 import type { UploadedDocumentFile } from '../common/interfaces/uploaded-file.interface';
+import { StockMovement } from '../stock/entities/stock-movement.entity';
+import { StockMovementType } from '../common/enums/stock-movement-type.enum';
 
 @Injectable()
 export class LoanRequestsService {
-  constructor(@InjectRepository(LoanRequest) private readonly requests: Repository<LoanRequest>, @InjectRepository(LoanRequestItem) private readonly requestItems: Repository<LoanRequestItem>, @InjectRepository(LoanDocument) private readonly documents: Repository<LoanDocument>, @InjectRepository(Item) private readonly items: Repository<Item>, @InjectRepository(Room) private readonly rooms: Repository<Room>, @InjectRepository(Lab) private readonly labs: Repository<Lab>) {}
+  constructor(@InjectRepository(LoanRequest) private readonly requests: Repository<LoanRequest>, @InjectRepository(LoanRequestItem) private readonly requestItems: Repository<LoanRequestItem>, @InjectRepository(LoanDocument) private readonly documents: Repository<LoanDocument>, @InjectRepository(StockMovement) private readonly movements: Repository<StockMovement>, @InjectRepository(Item) private readonly items: Repository<Item>, @InjectRepository(Room) private readonly rooms: Repository<Room>, @InjectRepository(Lab) private readonly labs: Repository<Lab>) {}
 
   async create(userId: string, dto: CreateLoanRequestDto): Promise<LoanRequest> {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -85,5 +87,25 @@ export class LoanRequestsService {
     else if (action === 'approve' && role === Role.KABAG_UMUM && request.status === LoanRequestStatus.DIPROSES_BAUM) request.status = LoanRequestStatus.DISETUJUI;
     else throw new ConflictException('Transisi status atau role tidak valid.');
     return this.requests.save(request);
+  }
+
+  async handover(requestId: string, actorId: string): Promise<LoanRequest> { return this.moveStock(requestId, actorId, StockMovementType.KELUAR); }
+  async returnItems(requestId: string, actorId: string): Promise<LoanRequest> { return this.moveStock(requestId, actorId, StockMovementType.KEMBALI); }
+  private async moveStock(requestId: string, actorId: string, type: StockMovementType): Promise<LoanRequest> {
+    return this.requests.manager.transaction(async (manager) => {
+      const request = await manager.getRepository(LoanRequest).findOne({ where: { id: requestId } });
+      if (!request || (type === StockMovementType.KELUAR ? request.status !== LoanRequestStatus.DISETUJUI : request.status !== LoanRequestStatus.DIKELUARKAN)) throw new ConflictException('Status pengajuan tidak sesuai untuk operasi stok.');
+      const details = await manager.getRepository(LoanRequestItem).find({ where: { loanRequestId: requestId } });
+      for (const detail of details) {
+        if (await manager.getRepository(StockMovement).findOne({ where: { loanRequestId: requestId, itemId: detail.itemId, jenis: type } })) throw new ConflictException('Pergerakan stok ini sudah dicatat.');
+        const item = await manager.getRepository(Item).createQueryBuilder('item').where('item.id = :id', { id: detail.itemId }).setLock('pessimistic_write').getOne();
+        if (!item) throw new NotFoundException('Barang tidak ditemukan.');
+        if (type === StockMovementType.KELUAR) { if (item.totalStok - item.jumlahDipinjam < detail.jumlah) throw new ConflictException(`Stok ${item.nama} tidak mencukupi.`); item.jumlahDipinjam += detail.jumlah; } else { if (item.jumlahDipinjam < detail.jumlah) throw new ConflictException(`Jumlah stok keluar ${item.nama} tidak konsisten.`); item.jumlahDipinjam -= detail.jumlah; }
+        await manager.getRepository(Item).save(item);
+        await manager.getRepository(StockMovement).save(manager.getRepository(StockMovement).create({ itemId: detail.itemId, loanRequestId: requestId, jenis: type, jumlah: detail.jumlah, actorId, kondisi: null }));
+      }
+      request.status = type === StockMovementType.KELUAR ? LoanRequestStatus.DIKELUARKAN : LoanRequestStatus.SELESAI;
+      return manager.getRepository(LoanRequest).save(request);
+    });
   }
 }

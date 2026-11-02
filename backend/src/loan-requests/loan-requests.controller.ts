@@ -42,6 +42,8 @@ export class LoanRequestsController {
   @UseGuards(RolesGuard)
   @Roles(Role.TU, Role.BAUM_STAFF, Role.KABAG_UMUM)
   reject(@CurrentUser() user: JwtPayload, @Param('id') id: string, @Body() dto: RejectLoanRequestDto) { return this.service.transition(id, user.sub, user.role, 'reject', dto.alasan); }
+  @Post(':id/handover') @UseGuards(RolesGuard) @Roles(Role.BAUM_STAFF) handover(@CurrentUser() user: JwtPayload, @Param('id') id: string) { return this.service.handover(id, user.sub); }
+  @Post(':id/return') @UseGuards(RolesGuard) @Roles(Role.BAUM_STAFF) returnItems(@CurrentUser() user: JwtPayload, @Param('id') id: string) { return this.service.returnItems(id, user.sub); }
   @Post(':id/documents')
   @UseInterceptors(FileInterceptor('file', { storage: memoryStorage(), limits: { fileSize: Number(process.env.UPLOAD_MAX_BYTES ?? 10 * 1024 * 1024) } }))
   @ApiOperation({ summary: 'Upload dokumen pendukung pengajuan secara privat' })

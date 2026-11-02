@@ -70,6 +70,11 @@ Role pada endpoint registrasi selalu dibuat sebagai `MAHASISWA`; role tidak dite
 | GET | `/api/v1/rooms` | Mengambil daftar ruang aktif | Publik |
 | GET | `/api/v1/labs` | Mengambil daftar laboratorium aktif | Publik |
 | GET | `/api/v1/items` | Mengambil daftar barang dan stok tersedia | Publik |
+| GET | `/api/v1/items/availability?date=YYYY-MM-DD` | Ketersediaan barang pada tanggal tertentu | Publik |
+| POST | `/api/v1/items` | Menambah barang | Role BAUM Staff |
+| PATCH | `/api/v1/items/{id}` | Mengubah data barang | Role BAUM Staff |
+| PATCH | `/api/v1/items/{id}/deactivate` | Menonaktifkan barang | Role BAUM Staff |
+| GET | `/api/v1/items/movements` | Riwayat pergerakan stok | Role BAUM Staff |
 | POST | `/api/v1/loan-requests` | Membuat pengajuan peminjaman | Access token |
 | GET | `/api/v1/loan-requests/mine` | Mengambil pengajuan milik pengguna | Access token |
 | POST | `/api/v1/loan-requests/{id}/submit` | Mengirim draft setelah dokumen wajib lengkap | Access token |
@@ -78,6 +83,8 @@ Role pada endpoint registrasi selalu dibuat sebagai `MAHASISWA`; role tidak dite
 | POST | `/api/v1/loan-requests/{id}/process-baum` | Memproses pengajuan di BAUM | Role BAUM Staff |
 | POST | `/api/v1/loan-requests/{id}/approve` | Persetujuan akhir | Role Kabag Umum |
 | POST | `/api/v1/loan-requests/{id}/reject` | Menolak pengajuan dengan alasan | TU/BAUM/Kabag |
+| POST | `/api/v1/loan-requests/{id}/handover` | Mencatat barang keluar | Role BAUM Staff |
+| POST | `/api/v1/loan-requests/{id}/return` | Mencatat barang kembali | Role BAUM Staff |
 
 Frontend menggunakan alur berikut:
 
@@ -164,6 +171,10 @@ Validasi yang sudah tersedia saat membuat pengajuan:
 - Minimal satu barang dan item tidak boleh duplikat.
 - Jumlah barang tidak boleh melebihi stok tersedia.
 - Pengajuan tidak mengurangi stok fisik.
+- Ketersediaan tanggal memperhitungkan pengajuan aktif.
+- Serah-terima menambah `jumlahDipinjam` secara transaksional.
+- Pengembalian mengurangi `jumlahDipinjam` secara transaksional.
+- Pergerakan stok dicatat dengan item, pengajuan, aktor, jenis, jumlah, kondisi, dan waktu.
 
 Relasi `programs.fakultasId` dan `users.programId` menggunakan foreign key. Saat registrasi, backend juga memeriksa bahwa program studi yang dikirim memang milik fakultas yang dipilih.
 
@@ -180,6 +191,7 @@ Migration yang sudah tersedia:
 7. `1729607400000-CreateItemsAndLoanRequestsTables`
 8. `1729607500000-CreateLoanDocumentsTable`
 9. `1729607600000-AddDraftLoanRequestStatus`
+10. `1729607700000-CreateStockMovementsTable`
 
 Jalankan dari folder `backend`:
 
