@@ -1,11 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { FacultiesModule } from './faculties/faculties.module';
+import { ProgramsModule } from './programs/programs.module';
+import { RoomsModule } from './rooms/rooms.module';
+import { LabsModule } from './labs/labs.module';
+import { ItemsModule } from './items/items.module';
+import { LoanRequestsModule } from './loan-requests/loan-requests.module';
 
 @Module({
   imports: [
@@ -34,8 +37,11 @@ import { FacultiesModule } from './faculties/faculties.module';
     AuthModule,
     UsersModule,
     FacultiesModule,
+    ProgramsModule,
+    RoomsModule,
+    LabsModule,
+    ItemsModule,
+    LoanRequestsModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

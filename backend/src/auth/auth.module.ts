@@ -7,11 +7,13 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { UsersModule } from '../users/users.module';
 import { FacultiesModule } from '../faculties/faculties.module';
+import { ProgramsModule } from '../programs/programs.module';
 
 @Module({
   imports: [
     UsersModule,
     FacultiesModule,
+    ProgramsModule,
     PassportModule,
     // JwtModule tanpa secret global — secret diambil dari ConfigService per-sign di AuthService
     JwtModule.register({}),

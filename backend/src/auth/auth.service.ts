@@ -13,6 +13,7 @@ import { AuthResponseDto } from './dto/auth-response.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { Role } from '../common/enums/role.enum';
 import { FacultiesService } from '../faculties/faculties.service';
+import { ProgramsService } from '../programs/programs.service';
 
 const BCRYPT_SALT_ROUNDS = 12;
 
@@ -23,6 +24,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly facultiesService: FacultiesService,
+    private readonly programsService: ProgramsService,
   ) {}
 
   /**
@@ -34,6 +36,13 @@ export class AuthService {
     const faculty = await this.facultiesService.findById(dto.fakultasId);
     if (!faculty) {
       throw new ConflictException('Fakultas yang dipilih tidak terdaftar.');
+    }
+
+    const program = await this.programsService.findById(dto.programId);
+    if (!program || program.fakultasId !== dto.fakultasId) {
+      throw new ConflictException(
+        'Program studi tidak terdaftar pada fakultas yang dipilih.',
+      );
     }
 
     const existing = await this.usersService.findByEmail(dto.email);
@@ -52,6 +61,7 @@ export class AuthService {
       namaLengkap: dto.namaLengkap,
       nim: dto.nim,
       fakultasId: dto.fakultasId,
+      programId: dto.programId,
       role: Role.MAHASISWA, // Hardcode, tidak dari DTO
     });
 
@@ -60,6 +70,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       fakultasId: user.fakultasId,
+      programId: user.programId,
     });
   }
 
@@ -88,6 +99,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       fakultasId: user.fakultasId,
+      programId: user.programId,
     });
   }
 
@@ -122,6 +134,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       fakultasId: user.fakultasId,
+      programId: user.programId,
     });
   }
 
@@ -170,6 +183,7 @@ export class AuthService {
         role: user.role,
         nim: user.nim,
         fakultasId: user.fakultasId,
+        programId: user.programId,
         isActive: user.isActive,
         createdAt: user.createdAt,
       },
