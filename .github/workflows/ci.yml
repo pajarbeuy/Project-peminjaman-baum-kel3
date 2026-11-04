@@ -39,7 +39,7 @@ jobs:
         run: npm run lint
 
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit -p tsconfig.build.json
 
       - name: Unit tests
         run: npm test -- --passWithNoTests --forceExit
@@ -189,7 +189,7 @@ jobs:
         run: npm run lint
 
       - name: Typecheck
-        run: npx tsc --noEmit -p tsconfig.app.json
+        run: npx tsc --noEmit -p tsconfig.build.json -p tsconfig.app.json
 
       - name: Build (Vite)
         run: npm run build
