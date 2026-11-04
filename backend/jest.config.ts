@@ -14,7 +14,7 @@ const config: Config = {
   rootDir: '.',
   testRegex: '.*\\.spec\\.ts$',
 
-  // ESM mode: ts-jest/esm preset diperlukan karena @nestjs/* v12 adalah pure ESM
+  // ESM mode: diperlukan karena @nestjs/* v12 adalah pure ESM
   extensionsToTreatAsEsm: ['.ts'],
   transform: {
     '^.+\\.(t|j)s$': [
@@ -27,15 +27,17 @@ const config: Config = {
   },
 
   // node_modules @nestjs/* perlu ikut di-transform karena pure ESM
-  transformIgnorePatterns: [
-    '/node_modules/(?!(@nestjs)/)',
-  ],
+  transformIgnorePatterns: ['/node_modules/(?!(@nestjs)/)'],
 
   moduleNameMapper: {
     // Tangani ekstensi .js pada import ESM (TS pakai .js pada output)
     '^(\\.{1,2}/.*)\\.js$': '$1',
     ...pathsToModuleNameMapper(paths, { prefix: '<rootDir>/' }),
   },
+
+  // Setup file yang me-assign jest ke globalThis agar spec lama
+  // yang belum menggunakan `import { jest } from '@jest/globals'` tetap berjalan.
+  setupFilesAfterEnv: ['<rootDir>/test/jest-esm-setup.ts'],
 
   collectCoverageFrom: [
     'src/**/*.(t|j)s',
