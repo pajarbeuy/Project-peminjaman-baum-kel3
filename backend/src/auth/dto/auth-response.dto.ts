@@ -20,6 +20,9 @@ export class UserProfileDto {
   @ApiProperty({ nullable: true })
   fakultasId: string | null;
 
+  @ApiProperty({ nullable: true })
+  programId: string | null;
+
   @ApiProperty()
   isActive: boolean;
 

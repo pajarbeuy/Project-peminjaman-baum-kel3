@@ -41,6 +41,9 @@ export class User {
   @Column({ nullable: true, type: 'varchar', length: 36 })
   fakultasId: string | null;
 
+  @Column({ nullable: true, type: 'varchar', length: 36 })
+  programId: string | null;
+
   /**
    * Hash refresh token — select: false agar tidak bocor ke response.
    * Di-clear saat logout.
