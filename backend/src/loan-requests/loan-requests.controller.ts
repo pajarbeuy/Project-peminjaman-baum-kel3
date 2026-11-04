@@ -36,7 +36,7 @@ export class LoanRequestsController {
   processBaum(@CurrentUser() user: JwtPayload, @Param('id') id: string) { return this.service.transition(id, user.sub, user.role, 'process'); }
   @Post(':id/approve')
   @UseGuards(RolesGuard)
-  @Roles(Role.KABAG_UMUM)
+  @Roles(Role.BAUM_STAFF, Role.KABAG_UMUM)
   approve(@CurrentUser() user: JwtPayload, @Param('id') id: string) { return this.service.transition(id, user.sub, user.role, 'approve'); }
   @Post(':id/reject')
   @UseGuards(RolesGuard)

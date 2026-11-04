@@ -84,7 +84,7 @@ export class LoanRequestsService {
       request.status = LoanRequestStatus.DITOLAK; request.rejectionReason = reason.trim();
     } else if (action === 'verify' && role === Role.TU && request.status === LoanRequestStatus.DIAJUKAN) request.status = LoanRequestStatus.DIVERIFIKASI_TU;
     else if (action === 'process' && role === Role.BAUM_STAFF && request.status === LoanRequestStatus.DIVERIFIKASI_TU) request.status = LoanRequestStatus.DIPROSES_BAUM;
-    else if (action === 'approve' && role === Role.KABAG_UMUM && request.status === LoanRequestStatus.DIPROSES_BAUM) request.status = LoanRequestStatus.DISETUJUI;
+    else if (action === 'approve' && [Role.BAUM_STAFF, Role.KABAG_UMUM].includes(role) && request.status === LoanRequestStatus.DIPROSES_BAUM) request.status = LoanRequestStatus.DISETUJUI;
     else throw new ConflictException('Transisi status atau role tidak valid.');
     return this.requests.save(request);
   }
