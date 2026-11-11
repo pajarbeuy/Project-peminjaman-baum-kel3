@@ -18,8 +18,9 @@ async function seed(): Promise<void> {
   const repository = dataSource.getRepository(Room);
   let created = 0;
 
-  for (const lantai of [6, 7]) {
-    for (let nomor = 1; nomor <= 14; nomor += 1) {
+  for (const lantai of [1, 5, 6, 7]) {
+    const totalNomor = lantai === 1 ? 10 : 14;
+    for (let nomor = 1; nomor <= totalNomor; nomor += 1) {
       const kode = `${lantai}.${nomor}`;
       const existing = await repository.findOne({ where: { kode } });
       if (existing) continue;

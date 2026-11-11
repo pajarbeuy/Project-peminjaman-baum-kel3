@@ -5,13 +5,24 @@ import './SprintTwo.css'
 type User = { namaLengkap: string; role: string }
 type Faculty = { id: string; nama: string }
 type Program = { id: string; nama: string; fakultasId: string }
-type Room = { id: string; kode: string; lantai: number; nomor: number }
+type RoomStatus = 'Tersedia' | 'Tidak Tersedia' | 'Sedang Digunakan'
+type Room = { id: string; kode: string; lantai: number; nomor: number; isActive?: boolean; status?: string }
 type Lab = { id: string; kode: string; nama: string; pengelola: string | null }
 type Item = { id: string; kode: string; nama: string; kategori: string; totalStok: number; jumlahDipinjam: number; stokTersedia: number; isActive?: boolean }
 type Loan = { id: string; status: string }
 type Page = 'master' | 'availability' | 'booking'
 type ResourceState<T> = { data: T[]; loading: boolean; error: string }
 type DocumentKind = 'SURAT_BIDANG_3' | 'KTM' | 'BIODATA_ORMAWA'
+
+function resolveRoomStatus(room: Room): RoomStatus {
+  if (room.status === 'Sedang Digunakan' || room.status === 'SEDANG_DIGUNAKAN') {
+    return 'Sedang Digunakan'
+  }
+  if (room.status === 'Tidak Tersedia' || room.status === 'TIDAK_TERSEDIA' || room.isActive === false) {
+    return 'Tidak Tersedia'
+  }
+  return 'Tersedia'
+}
 
 const emptyState = <T,>(): ResourceState<T> => ({ data: [], loading: false, error: '' })
 const documentLabels: Record<DocumentKind, string> = {
@@ -107,20 +118,301 @@ function MasterData() {
   </section>
 }
 
-function Availability() {
+function Availability({ onProceedToBooking }: { onProceedToBooking?: (roomId: string) => void }) {
   const [date, setDate] = useState('')
   const [refreshKey, setRefreshKey] = useState(0)
-  const rooms = useResource<Room>('/rooms', refreshKey)
+  const [selectedFloor, setSelectedFloor] = useState('')
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
+  const [selectionNotice, setSelectionNotice] = useState<{ message: string; isError: boolean } | null>(null)
+
+  const rooms = useResource<Room>(date ? `/rooms?date=${encodeURIComponent(date)}` : '/rooms', refreshKey)
   const labs = useResource<Lab>('/labs', refreshKey)
   const items = useResource<Item>(date ? `/items/availability?date=${encodeURIComponent(date)}` : '/items', refreshKey)
-  return <section className="st-page"><div className="st-heading"><div><p className="st-kicker">KETERSEDIAAN</p><h1>Cek ketersediaan sarana</h1><p>Pilih tanggal untuk memuat stok barang terkini dari backend.</p></div></div><label className="st-date">Tanggal peminjaman<input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label><div className="st-section"><h2>Ruang kelas</h2><p className="st-note">API jadwal ruang berdasarkan tanggal belum tersedia. Daftar berikut adalah data ruang aktif, bukan konfirmasi ketersediaan.</p><StateMessage state={rooms} retry={() => setRefreshKey((key) => key + 1)} />{rooms.data.length > 0 && <div className="st-chip-list">{rooms.data.map((room) => <span className="st-chip" key={room.id}>{room.kode} · Lantai {room.lantai}</span>)}</div>}</div><div className="st-section"><h2>Laboratorium</h2><p className="st-note">API jadwal laboratorium berdasarkan tanggal belum tersedia. Daftar berikut adalah data aktif, bukan konfirmasi ketersediaan.</p><StateMessage state={labs} retry={() => setRefreshKey((key) => key + 1)} />{labs.data.length > 0 && <div className="st-chip-list">{labs.data.map((lab) => <span className="st-chip" key={lab.id}>{lab.nama} · {lab.kode}</span>)}</div>}</div><div className="st-section"><h2>Stok barang {date && <small>pada {date}</small>}</h2><StateMessage state={items} retry={() => setRefreshKey((key) => key + 1)} />{items.data.length > 0 && <div className="st-table-wrap"><table className="st-table"><thead><tr><th>Barang</th><th>Kategori</th><th>Stok tersedia</th></tr></thead><tbody>{items.data.map((item) => <tr key={item.id}><td>{item.nama}</td><td>{item.kategori}</td><td><span className={item.stokTersedia > 0 ? 'st-stock-ok' : 'st-stock-empty'}>{item.stokTersedia}</span></td></tr>)}</tbody></table></div>}</div></section>
+
+  // Buat daftar lantai gedung secara dinamis berdasarkan data ruang di sistem
+  const floors = useMemo(() => {
+    const existingFloors = rooms.data.map((r) => Number(r.lantai)).filter((n) => Number.isInteger(n) && n > 0)
+    const maxFloor = existingFloors.length > 0 ? Math.max(7, ...existingFloors) : 7
+    const floorSet = new Set<number>()
+    for (let f = 1; f <= maxFloor; f += 1) {
+      floorSet.add(f)
+    }
+    for (const f of existingFloors) {
+      floorSet.add(f)
+    }
+    return Array.from(floorSet).sort((a, b) => a - b)
+  }, [rooms.data])
+
+  function handleFloorChange(newFloor: string) {
+    setSelectedFloor(newFloor)
+    setSelectedRoomId(null) // QA-004: Mengganti lantai setelah memilih ruangan -> Pilihan ruangan sebelumnya ter-reset
+    setSelectionNotice(null)
+  }
+
+  function handleSelectRoom(room: Room) {
+    const status = resolveRoomStatus(room)
+    if (status !== 'Tersedia') {
+      // QA-006: Memilih ruangan tidak tersedia -> Sistem menolak pilihan
+      setSelectionNotice({
+        message: `Ruang ${room.kode} tidak dapat dipilih karena sedang berstatus "${status}".`,
+        isError: true,
+      })
+      return
+    }
+    // QA-005: Memilih ruangan tersedia -> Ruangan berhasil dipilih
+    if (selectedRoomId === room.id) {
+      setSelectedRoomId(null)
+      setSelectionNotice(null)
+    } else {
+      setSelectedRoomId(room.id)
+      setSelectionNotice({
+        message: `Ruang ${room.kode} (Lantai ${room.lantai}) berhasil dipilih.`,
+        isError: false,
+      })
+    }
+  }
+
+  const floorRooms = useMemo(() => {
+    if (!selectedFloor) return []
+    return rooms.data.filter((r) => String(r.lantai) === selectedFloor)
+  }, [rooms.data, selectedFloor])
+
+  const selectedRoom = useMemo(() => {
+    if (!selectedRoomId) return null
+    return rooms.data.find((r) => r.id === selectedRoomId) ?? null
+  }, [rooms.data, selectedRoomId])
+
+  return (
+    <section className="st-page">
+      <div className="st-heading">
+        <div>
+          <p className="st-kicker">KETERSEDIAAN</p>
+          <h1>Cek ketersediaan sarana</h1>
+          <p>Pilih tanggal peminjaman dan lantai untuk melihat ketersediaan ruang kelas terkini.</p>
+        </div>
+      </div>
+
+      <label className="st-date">
+        Tanggal peminjaman
+        <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+      </label>
+
+      <div className="st-section">
+        <h2>Ruang kelas</h2>
+        <p className="st-note">
+          Gunakan dropdown berikut untuk memilih lantai. Hanya ruang kelas pada lantai yang dipilih yang akan ditampilkan.
+        </p>
+
+        {/* QA-001: Dropdown pemilihan lantai dengan placeholder */}
+        <div className="st-floor-selector">
+          <label htmlFor="floor-select">Pilih Lantai</label>
+          <select
+            id="floor-select"
+            value={selectedFloor}
+            onChange={(event) => handleFloorChange(event.target.value)}
+          >
+            <option value="">Pilih lantai terlebih dahulu</option>
+            {floors.map((floor) => (
+              <option key={floor} value={String(floor)}>
+                Lantai {floor}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectionNotice && (
+          <div
+            className={`st-notice-banner ${selectionNotice.isError ? 'is-error' : 'is-success'}`}
+            role="alert"
+          >
+            <span>{selectionNotice.message}</span>
+            <button
+              type="button"
+              className="st-notice-dismiss"
+              onClick={() => setSelectionNotice(null)}
+              aria-label="Tutup notifikasi"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        {/* State Error atau Loading API */}
+        {rooms.loading ? (
+          <div className="st-empty" role="status">Memuat data ruangan…</div>
+        ) : rooms.error ? (
+          <div className="st-alert" role="alert">
+            <span>{rooms.error}</span>
+            <button
+              type="button"
+              className="st-button st-button-secondary"
+              onClick={() => setRefreshKey((key) => key + 1)}
+            >
+              Coba lagi
+            </button>
+          </div>
+        ) : !selectedFloor ? (
+          /* Pengguna harus memilih lantai terlebih dahulu */
+          <div className="st-empty">
+            Pilih lantai terlebih dahulu untuk melihat daftar ruang kelas.
+          </div>
+        ) : floorRooms.length === 0 ? (
+          /* QA-007: Memilih lantai tanpa ruangan -> Pesan data kosong tampil */
+          <div className="st-empty">
+            Belum ada ruang kelas pada Lantai {selectedFloor}.
+          </div>
+        ) : (
+          /* QA-002, QA-003: Menampilkan ruang kelas lantai yang dipilih */
+          <div className="st-room-grid">
+            {floorRooms.map((room) => {
+              const status = resolveRoomStatus(room)
+              const isSelected = selectedRoomId === room.id
+              const isAvailable = status === 'Tersedia'
+              const badgeClass =
+                status === 'Tersedia'
+                  ? 'st-status-available'
+                  : status === 'Sedang Digunakan'
+                  ? 'st-status-inuse'
+                  : 'st-status-unavailable'
+              const icon =
+                status === 'Tersedia' ? '✓' : status === 'Sedang Digunakan' ? '⏱' : '✕'
+
+              return (
+                <div
+                  key={room.id}
+                  className={`st-room-card ${isAvailable ? 'is-available' : 'is-disabled'} ${
+                    isSelected ? 'is-selected' : ''
+                  }`}
+                  onClick={() => handleSelectRoom(room)}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={isSelected}
+                  aria-disabled={!isAvailable}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      handleSelectRoom(room)
+                    }
+                  }}
+                >
+                  <div className="st-room-card-header">
+                    <span className="st-room-name">Ruang {room.kode}</span>
+                    {isSelected && <span className="st-room-selected-pill">Terpilih</span>}
+                  </div>
+                  <p className="st-room-meta">Lantai {room.lantai} · Ruang {room.nomor}</p>
+                  <div className="st-room-status-wrap">
+                    <span className={`st-status-badge ${badgeClass}`}>
+                      <span className="st-status-icon" aria-hidden="true">{icon}</span>
+                      <span className="st-status-text">{status}</span>
+                    </span>
+                  </div>
+                  <div className="st-room-action-text">
+                    {isSelected
+                      ? 'Klik untuk membatalkan pilihan'
+                      : isAvailable
+                      ? 'Klik untuk memilih ruangan'
+                      : 'Ruangan tidak dapat dipilih'}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {selectedRoom && (
+          <div className="st-selected-summary" role="region" aria-label="Ruangan terpilih">
+            <div className="st-selected-info">
+              <span className="st-selected-check" aria-hidden="true">✓</span>
+              <div>
+                <strong>Ruang {selectedRoom.kode} terpilih</strong>
+                <p>
+                  Lantai {selectedRoom.lantai} · Ruang {selectedRoom.nomor} · Status:{' '}
+                  {resolveRoomStatus(selectedRoom)}
+                </p>
+              </div>
+            </div>
+            <div className="st-selected-actions">
+              {onProceedToBooking && (
+                <button
+                  type="button"
+                  className="st-button"
+                  onClick={() => onProceedToBooking(selectedRoom.id)}
+                >
+                  Lanjut ajukan peminjaman
+                </button>
+              )}
+              <button
+                type="button"
+                className="st-button st-button-secondary"
+                onClick={() => {
+                  setSelectedRoomId(null)
+                  setSelectionNotice(null)
+                }}
+              >
+                Batalkan pilihan
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="st-section">
+        <h2>Laboratorium</h2>
+        <p className="st-note">
+          API jadwal laboratorium berdasarkan tanggal belum tersedia. Daftar berikut adalah data aktif, bukan konfirmasi ketersediaan.
+        </p>
+        <StateMessage state={labs} retry={() => setRefreshKey((key) => key + 1)} />
+        {labs.data.length > 0 && (
+          <div className="st-chip-list">
+            {labs.data.map((lab) => (
+              <span className="st-chip" key={lab.id}>
+                {lab.nama} · {lab.kode}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="st-section">
+        <h2>Stok barang {date && <small>pada {date}</small>}</h2>
+        <StateMessage state={items} retry={() => setRefreshKey((key) => key + 1)} />
+        {items.data.length > 0 && (
+          <div className="st-table-wrap">
+            <table className="st-table">
+              <thead>
+                <tr>
+                  <th>Barang</th>
+                  <th>Kategori</th>
+                  <th>Stok tersedia</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.data.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.nama}</td>
+                    <td>{item.kategori}</td>
+                    <td>
+                      <span className={item.stokTersedia > 0 ? 'st-stock-ok' : 'st-stock-empty'}>
+                        {item.stokTersedia}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
+  )
 }
 
-function NewLoan() {
+function NewLoan({ defaultRoomId = '' }: { defaultRoomId?: string }) {
   const rooms = useResource<Room>('/rooms')
   const labs = useResource<Lab>('/labs')
   const items = useResource<Item>('/items')
   const [resourceType, setResourceType] = useState<'room' | 'lab'>('room')
+  const [selectedResourceId, setSelectedResourceId] = useState(defaultRoomId)
   const [date, setDate] = useState('')
   const [durasi, setDurasi] = useState(1)
   const [itemLines, setItemLines] = useState([{ itemId: '', jumlah: 1 }])
@@ -156,6 +448,7 @@ function NewLoan() {
       let currentId = requestId
       if (!currentId) {
         const form = new FormData(event.currentTarget)
+        const chosenResourceId = selectedResourceId || String(form.get('resourceId') || '')
         const body = {
           tanggalMulai: date,
           durasiHari: Number(durasi),
@@ -163,7 +456,7 @@ function NewLoan() {
           unitKerja: form.get('unitKerja'),
           penanggungJawab: form.get('penanggungJawab'),
           kontakPeminjam: form.get('kontakPeminjam'),
-          ...(resourceType === 'room' ? { roomId: form.get('resourceId') } : { labId: form.get('resourceId') }),
+          ...(resourceType === 'room' ? { roomId: chosenResourceId } : { labId: chosenResourceId }),
           items: itemLines.map((line) => ({ itemId: line.itemId, jumlah: Number(line.jumlah) })),
         }
         const draft = await apiRequest<Loan>('/loan-requests', { method: 'POST', body: JSON.stringify(body) })
@@ -184,10 +477,64 @@ function NewLoan() {
   }
 
   if (success) return <section className="st-page"><div className="st-success"><span className="st-success-icon">✓</span><p className="st-kicker">PENGAJUAN TERKIRIM</p><h1>Pengajuan berhasil dikirim</h1><p>Status: <strong>{success.status}</strong></p><p className="st-muted">ID pengajuan: {success.id}</p></div></section>
-  return <section className="st-page"><div className="st-heading"><div><p className="st-kicker">PB-15–PB-18</p><h1>Formulir pengajuan peminjaman</h1><p>Isi data, pilih sarana, dan lampirkan dokumen wajib. Validasi backend tetap berlaku.</p></div></div>{error && <div className="st-alert" role="alert">{error}{requestId && <span> Draft tersimpan dengan ID {requestId}; Anda dapat mencoba mengirim ulang.</span>}</div>}<form className="st-loan-form" onSubmit={(event) => void submit(event)}><section className="st-form-card"><h2>Jadwal &amp; keperluan</h2><div className="st-form-grid"><label>Tanggal peminjaman<input type="date" required min={minDate} value={date} onChange={(event) => setDate(event.target.value)} /><small>Tanggal minimal H-7: {minDate}</small></label><label>Durasi (hari)<input type="number" min="1" step="1" required value={durasi} onChange={(event) => setDurasi(Number(event.target.value))} /></label><label className="st-span-2">Keperluan<textarea name="keperluan" required maxLength={1000} rows={3} placeholder="Jelaskan tujuan peminjaman" /></label><label>Unit kerja<input name="unitKerja" required /></label><label>Penanggung jawab<input name="penanggungJawab" required /></label><label>Kontak peminjam<input name="kontakPeminjam" type="tel" required /></label></div></section><section className="st-form-card"><h2>Ruang atau laboratorium</h2><div className="st-choice-row"><label><input type="radio" checked={resourceType === 'room'} onChange={() => setResourceType('room')} /> Ruang</label><label><input type="radio" checked={resourceType === 'lab'} onChange={() => setResourceType('lab')} /> Laboratorium</label></div><label>{resourceType === 'room' ? 'Ruang kelas' : 'Laboratorium'}<select name="resourceId" required defaultValue=""><option value="">Pilih {resourceType === 'room' ? 'ruang' : 'laboratorium'}</option>{(resourceType === 'room' ? rooms.data : labs.data).map((resource) => <option key={resource.id} value={resource.id}>{resourceType === 'room' ? `${(resource as Room).kode} · Lantai ${(resource as Room).lantai}` : `${(resource as Lab).nama} · ${(resource as Lab).kode}`}</option>)}</select></label>{(rooms.error || labs.error) && <div className="st-form-error" role="alert">{rooms.error || labs.error}</div>}</section><section className="st-form-card"><div className="st-card-heading"><div><h2>Barang &amp; jumlah</h2><p>Backend mewajibkan minimal satu barang untuk setiap pengajuan saat ini.</p></div><button type="button" className="st-button st-button-secondary" onClick={() => setItemLines((current) => [...current, { itemId: '', jumlah: 1 }])}>Tambah barang</button></div>{itemLines.map((line, index) => { const item = lookup.get(line.itemId); return <div className="st-item-line" key={index}><label>Barang<select required value={line.itemId} onChange={(event) => setLine(index, { itemId: event.target.value })}><option value="">Pilih barang</option>{items.data.map((option) => <option key={option.id} value={option.id} disabled={itemLines.some((other, position) => position !== index && other.itemId === option.id)}>{option.nama}</option>)}</select></label><label>Jumlah<input type="number" min="1" max={item?.stokTersedia ?? undefined} step="1" required value={line.jumlah} onChange={(event) => setLine(index, { jumlah: Number(event.target.value) })} /><small>Stok tersedia: {item?.stokTersedia ?? '—'}</small></label>{itemLines.length > 1 && <button type="button" className="st-button st-button-danger" onClick={() => setItemLines((current) => current.filter((_, position) => position !== index))}>Hapus</button>}</div>})}{items.error && <div className="st-form-error" role="alert">{items.error}</div>}</section><section className="st-form-card"><h2>Dokumen pendukung</h2><p>Format yang diterima backend: PDF, JPG, PNG. Batas default backend 10 MB; jika konfigurasi backend diubah, samakan nilai VITE_UPLOAD_MAX_BYTES di frontend.</p><div className="st-doc-grid">{requiredKinds.map((kind) => <label className="st-doc" key={kind}><span>{documentLabels[kind]} <b>Wajib</b></span><input type="file" disabled={uploaded.includes(kind)} accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={(event) => changeFile(kind, event.target.files?.[0])} />{documents[kind] && <small>{documents[kind]!.name} · {(documents[kind]!.size / 1024).toFixed(1)} KB <button type="button" className="st-link-button" onClick={() => setDocuments((current) => ({ ...current, [kind]: undefined }))}>Hapus</button></small>}{uploadingDocument === kind && <small role="status">Sedang mengunggah…</small>}{documents[kind] && !uploaded.includes(kind) && uploadingDocument !== kind && <small>File siap, menunggu pengiriman.</small>}{uploaded.includes(kind) && <small className="st-stock-ok">Sudah diunggah ke draft privat; API belum menyediakan penghapusan dokumen.</small>}</label>)}</div></section><section className="st-form-card"><h2>Ringkasan</h2><p>Tanggal: <strong>{date || 'Belum dipilih'}</strong> · Durasi: <strong>{durasi} hari</strong></p><p>Barang: <strong>{itemLines.filter((line) => line.itemId).map((line) => `${lookup.get(line.itemId)?.nama ?? 'Barang'} × ${line.jumlah}`).join(', ') || 'Belum dipilih'}</strong></p><p>Dokumen wajib: <strong>{requiredKinds.filter((kind) => documents[kind] || uploaded.includes(kind)).length}/{requiredKinds.length} lengkap</strong></p></section><button className="st-button st-submit" disabled={busy || !rooms.data.length && !labs.data.length || !items.data.length}>{busy ? 'Mengirim pengajuan…' : requestId ? 'Lanjutkan pengiriman draft' : 'Kirim pengajuan'}</button></form></section>
+  return <section className="st-page"><div className="st-heading"><div><p className="st-kicker">PB-15–PB-18</p><h1>Formulir pengajuan peminjaman</h1><p>Isi data, pilih sarana, dan lampirkan dokumen wajib. Validasi backend tetap berlaku.</p></div></div>{error && <div className="st-alert" role="alert">{error}{requestId && <span> Draft tersimpan dengan ID {requestId}; Anda dapat mencoba mengirim ulang.</span>}</div>}<form className="st-loan-form" onSubmit={(event) => void submit(event)}><section className="st-form-card"><h2>Jadwal &amp; keperluan</h2><div className="st-form-grid"><label>Tanggal peminjaman<input type="date" required min={minDate} value={date} onChange={(event) => setDate(event.target.value)} /><small>Tanggal minimal H-7: {minDate}</small></label><label>Durasi (hari)<input type="number" min="1" step="1" required value={durasi} onChange={(event) => setDurasi(Number(event.target.value))} /></label><label className="st-span-2">Keperluan<textarea name="keperluan" required maxLength={1000} rows={3} placeholder="Jelaskan tujuan peminjaman" /></label><label>Unit kerja<input name="unitKerja" required /></label><label>Penanggung jawab<input name="penanggungJawab" required /></label><label>Kontak peminjam<input name="kontakPeminjam" type="tel" required /></label></div></section><section className="st-form-card"><h2>Ruang atau laboratorium</h2><div className="st-choice-row"><label><input type="radio" checked={resourceType === 'room'} onChange={() => { setResourceType('room'); setSelectedResourceId(''); }} /> Ruang</label><label><input type="radio" checked={resourceType === 'lab'} onChange={() => { setResourceType('lab'); setSelectedResourceId(''); }} /> Laboratorium</label></div><label>{resourceType === 'room' ? 'Ruang kelas' : 'Laboratorium'}<select name="resourceId" required value={selectedResourceId} onChange={(event) => setSelectedResourceId(event.target.value)}><option value="">Pilih {resourceType === 'room' ? 'ruang' : 'laboratorium'}</option>{(resourceType === 'room' ? rooms.data : labs.data).map((resource) => <option key={resource.id} value={resource.id}>{resourceType === 'room' ? `${(resource as Room).kode} · Lantai ${(resource as Room).lantai}` : `${(resource as Lab).nama} · ${(resource as Lab).kode}`}</option>)}</select></label>{(rooms.error || labs.error) && <div className="st-form-error" role="alert">{rooms.error || labs.error}</div>}</section><section className="st-form-card"><div className="st-card-heading"><div><h2>Barang &amp; jumlah</h2><p>Backend mewajibkan minimal satu barang untuk setiap pengajuan saat ini.</p></div><button type="button" className="st-button st-button-secondary" onClick={() => setItemLines((current) => [...current, { itemId: '', jumlah: 1 }])}>Tambah barang</button></div>{itemLines.map((line, index) => { const item = lookup.get(line.itemId); return <div className="st-item-line" key={index}><label>Barang<select required value={line.itemId} onChange={(event) => setLine(index, { itemId: event.target.value })}><option value="">Pilih barang</option>{items.data.map((option) => <option key={option.id} value={option.id} disabled={itemLines.some((other, position) => position !== index && other.itemId === option.id)}>{option.nama}</option>)}</select></label><label>Jumlah<input type="number" min="1" max={item?.stokTersedia ?? undefined} step="1" required value={line.jumlah} onChange={(event) => setLine(index, { jumlah: Number(event.target.value) })} /><small>Stok tersedia: {item?.stokTersedia ?? '—'}</small></label>{itemLines.length > 1 && <button type="button" className="st-button st-button-danger" onClick={() => setItemLines((current) => current.filter((_, position) => position !== index))}>Hapus</button>}</div>})}{items.error && <div className="st-form-error" role="alert">{items.error}</div>}</section><section className="st-form-card"><h2>Dokumen pendukung</h2><p>Format yang diterima backend: PDF, JPG, PNG. Batas default backend 10 MB; jika konfigurasi backend diubah, samakan nilai VITE_UPLOAD_MAX_BYTES di frontend.</p><div className="st-doc-grid">{requiredKinds.map((kind) => <label className="st-doc" key={kind}><span>{documentLabels[kind]} <b>Wajib</b></span><input type="file" disabled={uploaded.includes(kind)} accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" onChange={(event) => changeFile(kind, event.target.files?.[0])} />{documents[kind] && <small>{documents[kind]!.name} · {(documents[kind]!.size / 1024).toFixed(1)} KB <button type="button" className="st-link-button" onClick={() => setDocuments((current) => ({ ...current, [kind]: undefined }))}>Hapus</button></small>}{uploadingDocument === kind && <small role="status">Sedang mengunggah…</small>}{documents[kind] && !uploaded.includes(kind) && uploadingDocument !== kind && <small>File siap, menunggu pengiriman.</small>}{uploaded.includes(kind) && <small className="st-stock-ok">Sudah diunggah ke draft privat; API belum menyediakan penghapusan dokumen.</small>}</label>)}</div></section><section className="st-form-card"><h2>Ringkasan</h2><p>Tanggal: <strong>{date || 'Belum dipilih'}</strong> · Durasi: <strong>{durasi} hari</strong></p><p>Barang: <strong>{itemLines.filter((line) => line.itemId).map((line) => `${lookup.get(line.itemId)?.nama ?? 'Barang'} × ${line.jumlah}`).join(', ') || 'Belum dipilih'}</strong></p><p>Dokumen wajib: <strong>{requiredKinds.filter((kind) => documents[kind] || uploaded.includes(kind)).length}/{requiredKinds.length} lengkap</strong></p></section><button className="st-button st-submit" disabled={busy || !rooms.data.length && !labs.data.length || !items.data.length}>{busy ? 'Mengirim pengajuan…' : requestId ? 'Lanjutkan pengiriman draft' : 'Kirim pengajuan'}</button></form></section>
 }
 
 export default function SprintTwo({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [page, setPage] = useState<Page>('master')
-  return <main className="st-layout"><aside className="st-sidebar"><div className="st-brand"><span className="st-brand-mark">U</span><div><strong>UKRI</strong><small>Sarana &amp; Prasarana</small></div></div><nav className="st-nav" aria-label="Navigasi utama"><button className={page === 'master' ? 'is-active' : ''} onClick={() => setPage('master')}>Data master</button><button className={page === 'availability' ? 'is-active' : ''} onClick={() => setPage('availability')}>Ketersediaan</button><button className={page === 'booking' ? 'is-active' : ''} onClick={() => setPage('booking')}>Ajukan peminjaman</button></nav><div className="st-account"><span>{user.namaLengkap}</span><small>{user.role}</small><button className="st-signout" onClick={onLogout}>Keluar</button></div></aside><div className="st-content">{page === 'master' ? <MasterData /> : page === 'availability' ? <Availability /> : <NewLoan />}</div></main>
+  const [preselectedRoomId, setPreselectedRoomId] = useState<string>('')
+
+  return (
+    <main className="st-layout">
+      <aside className="st-sidebar">
+        <div className="st-brand">
+          <span className="st-brand-mark">U</span>
+          <div>
+            <strong>UKRI</strong>
+            <small>Sarana &amp; Prasarana</small>
+          </div>
+        </div>
+        <nav className="st-nav" aria-label="Navigasi utama">
+          <button
+            className={page === 'master' ? 'is-active' : ''}
+            onClick={() => setPage('master')}
+          >
+            Data master
+          </button>
+          <button
+            className={page === 'availability' ? 'is-active' : ''}
+            onClick={() => setPage('availability')}
+          >
+            Ketersediaan
+          </button>
+          <button
+            className={page === 'booking' ? 'is-active' : ''}
+            onClick={() => setPage('booking')}
+          >
+            Ajukan peminjaman
+          </button>
+        </nav>
+        <div className="st-account">
+          <span>{user.namaLengkap}</span>
+          <small>{user.role}</small>
+          <button className="st-signout" onClick={onLogout}>Keluar</button>
+        </div>
+      </aside>
+      <div className="st-content">
+        {page === 'master' ? (
+          <MasterData />
+        ) : page === 'availability' ? (
+          <Availability
+            onProceedToBooking={(roomId) => {
+              setPreselectedRoomId(roomId)
+              setPage('booking')
+            }}
+          />
+        ) : (
+          <NewLoan key={preselectedRoomId || 'new-loan'} defaultRoomId={preselectedRoomId} />
+        )}
+      </div>
+    </main>
+  )
 }
+
